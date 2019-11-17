@@ -1,0 +1,19 @@
+# build
+/dist/
+
+# Testing
+tmp/
+junit/
+coverage/
+.nyc_output/
+
+# npm / yarn
+/node_modules/
+/npm-debug.log*
+/yarn-error.log
+
+# editors
+.vscode
+
+# macOS
+.DS_Store

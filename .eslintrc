@@ -1,0 +1,19 @@
+{
+  "extends": [ "airbnb-base" ],
+  "plugins": [ "import" ],
+  "env": {
+    "node": true
+  },
+  "parser": "babel-eslint",
+  "rules": {
+    "import/no-duplicates": 2,
+    "no-duplicate-imports": 0,
+    "prefer-const": 0,
+    "arrow-body-style": 0,
+    "no-use-before-define": 0,
+    "class-methods-use-this": 0,
+    "import/prefer-default-export": 0,
+    "max-len": [2, 120],
+    "new-cap": [2, { "newIsCap": true, "capIsNew": false }]
+  }
+}

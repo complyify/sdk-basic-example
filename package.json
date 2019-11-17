@@ -1,0 +1,32 @@
+{
+  "name": "@complyify/sdk-basic-example",
+  "version": "0.0.1",
+  "description": "An exmaple project utilizing @complyify/sdk without any framework",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/complyify/sdk-basic-example.git"
+  },
+  "keywords": [
+    "complyify"
+  ],
+  "author": "\"\"",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/complyify/sdk-basic-example/issues"
+  },
+  "homepage": "https://github.com/complyify/sdk-basic-example#readme",
+  "contributors": [
+    {
+      "name": "Ian Walton",
+      "email": "ian@complyify.com"
+    },
+    {
+      "name": "Jonathan Allen",
+      "email": "jonathan@complyify.com"
+    }
+  ]
+}
