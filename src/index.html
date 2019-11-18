@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script type='text/javascript' src='https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js'></script>
+  <script type="module">
+    require(['../node_modules/@complyify/sdk/dist/index'], function (complyify) {
+      console.log('Welcome to a Complyify SDK Example')
+
+      // These are the current configured API endpoints for each of the primary service groupings. Updates can be found at https://sdk.complyify.com/api/web/index.html#initializing.
+      const backend = {
+        orgUrl: 'https://backend-org.comply.cloud',
+        envUrl: 'https://backend-env.comply.cloud',
+        stdUrl: 'https://backend-std.comply.cloud',
+        engUrl: 'https://backend-eng.comply.cloud'
+      }
+
+      // Here we initialize the clients we anticipate using for this session.
+      console.log('CONFIGURING COMPLYIFY CLIENT')
+      const userClient = complyify.createUserClient(backend)
+      const organizationClient = complyify.createOrganizationClient(backend)
+      const environmentClient = complyify.createEnvironmentClient(backend)
+      const taskClient = complyify.createTaskClient(backend)
+
+      // This is a basic authentication call. For the example to work, you'll need to provide your own complyify credentials
+      const authenticateResult = userClient.authenticate({ username: '', password: '' })
+
+      authenticateResult.then(async ({ user, authorizedActions, success }) => {
+        if (success) {
+          console.log('AUTHENTICATED USER', user)
+
+          // Now we find organizations available to our user. Note no arguments are required, this call utilizes the token and certificate which were saved into our session by "authenticate".
+          const findOrgsAvailableToUserStream = await organizationClient.findByUser()
+
+
+          findOrgsAvailableToUserStream.on('data', async ({ organization }) => {
+            console.log('ORGANIZATION', organization)
+            // Here we'll take our first organization result and do more. If your credentials have access to multiple organizations, you'll need to select the organization you want to continue with.
+            const { id: organizationId } = organization
+
+            // Now we need to issue a token specific to this organization
+            await userClient.issueToken({ organization: organizationId })
+
+            // Now we need the environment(s) available to our organization
+            const findEnvironmentStream = await environmentClient.findByOrganization({ organization: organizationId })
+            findEnvironmentStream.on('data', async ({ environment }) => {
+              console.log('ENVIRONMENT', environment)
+
+              // Now we'll select our first environment and list currently open tasks
+              const { id: environmentId } = environment
+
+              const taskListStream = await taskClient.list({ environment: environmentId })
+
+              taskListStream.on('data', ({ task }) => {
+                console.log('TASK', task)
+              })
+            })
+          })
+
+          findOrgsAvailableToUserStream.on('error', error => {
+            // TODO: Handle find organizations error
+          })
+
+          findOrgsAvailableToUserStream.on('end', () => {
+            console.log('ORGANIZATION STREAM ENDED')
+          })
+
+        } else {
+          console.log('AUTHENTICATION ERROR - DID YOU INPUT YOUR CREDENTIALS?')
+        }
+      })
+    })
+  </script>
+</head>
+
+<body>
+  Hello from Complyify
+</body>
+
+</html>
