@@ -30,6 +30,6 @@
     }
   ],
   "dependencies": {
-    "@complyify/sdk": "^0.21.0-beta.145"
+    "@complyify/sdk": "^0.21.0-beta.173"
   }
 }

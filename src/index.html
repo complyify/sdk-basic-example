@@ -2,79 +2,143 @@
 <html>
 
 <head>
-  <script type='text/javascript' src='https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js'></script>
-  <script type="module">
-    require(['../node_modules/@complyify/sdk/dist/index'], function (complyify) {
-      console.log('Welcome to a Complyify SDK Example')
+  <script src='https://cdn.jsdelivr.net/g/lodash@4(lodash.min.js+lodash.fp.min.js)'></script>
+  <script type="text/javascript" src="../node_modules/@complyify/sdk/dist/index.js"></script>
+  <script type="text/javascript">
+    console.log('Welcome to a Complyify SDK Example')
 
-      // These are the current configured API endpoints for each of the primary service groupings. Updates can be found at https://sdk.complyify.com/api/web/index.html#initializing.
-      const backend = {
-        orgUrl: 'https://backend-org.comply.cloud',
-        envUrl: 'https://backend-env.comply.cloud',
-        stdUrl: 'https://backend-std.comply.cloud',
-        engUrl: 'https://backend-eng.comply.cloud'
-      }
+    // These are the current configured API endpoints for each of the primary service groupings. Updates can be found at https://sdk.complyify.com/api/web/index.html#initializing.
+    const backend = {
+      orgUrl: 'https://backend-org.comply.cloud',
+      envUrl: 'https://backend-env.comply.cloud',
+      stdUrl: 'https://backend-std.comply.cloud',
+      engUrl: 'https://backend-eng.comply.cloud'
+    }
 
-      // Here we initialize the clients we anticipate using for this session.
-      console.log('CONFIGURING COMPLYIFY CLIENT')
-      const userClient = complyify.createUserClient(backend)
-      const organizationClient = complyify.createOrganizationClient(backend)
-      const environmentClient = complyify.createEnvironmentClient(backend)
-      const taskClient = complyify.createTaskClient(backend)
+    // Here we initialize the clients we anticipate using for this session.
+    console.log('CONFIGURING COMPLYIFY CLIENT')
+    const { userClient, organizationClient, environmentClient, taskClient } = window.complyify.init(backend)
+
+    const authenticate = async ({ username, password }) => {
+      if (_.isEmpty(username)) throw new Error('MISSING_USERNAME')
+      if (_.isEmpty(password)) throw new Error('MISSING_PASSWORD')
 
       // This is a basic authentication call. For the example to work, you'll need to provide your own complyify credentials
-      const authenticateResult = userClient.authenticate({ username: '', password: '' })
+      console.log('AUTHENTICATING')
+      const authenticateResult = await userClient.authenticate({ username, password })
 
-      authenticateResult.then(async ({ user, authorizedActions, success }) => {
-        if (success) {
-          console.log('AUTHENTICATED USER', user)
+      console.log('AUTHENTICATED USER', authenticateResult)
 
-          // Now we find organizations available to our user. Note no arguments are required, this call utilizes the token and certificate which were saved into our session by "authenticate".
-          const findOrgsAvailableToUserStream = await organizationClient.findByUser()
+      const content = document.getElementById('content')
+      while (content.lastChild) {
+        content.removeChild(content.lastChild)
+      }
 
+      if (authenticateResult.success) {
+        const welcomeDiv = document.createElement('div')
+        welcomeDiv.innerText = `Hello, ${authenticateResult.user.fullName}!`
+        
+        content.appendChild(welcomeDiv)
 
-          findOrgsAvailableToUserStream.on('data', async ({ organization }) => {
-            console.log('ORGANIZATION', organization)
-            // Here we'll take our first organization result and do more. If your credentials have access to multiple organizations, you'll need to select the organization you want to continue with.
-            const { id: organizationId } = organization
+        console.log('FINDING USER ORGANIZATIONS')
+        // Now we find organizations available to our user. Note no arguments are required, this call utilizes the token and certificate which were saved into our session by "authenticate".
+        const organizationStream = await organizationClient.findByUser()
 
-            // Now we need to issue a token specific to this organization
-            await userClient.issueToken({ organization: organizationId })
+        // For each organization available to our user we'll create a clickable div to retrieve more data about the organization on demand.
+        organizationStream.on('data', async ({ organization }) => {
+          console.log('FOUND USER ORGANIZATION', organization)
+          content.appendChild(constructOrgDiv({ content }, { organization }))
+        })
+      } else {
+        const errorDiv = document.createElement('div')
+        errorDiv.innerText = `Error: ${authenticateResult.error}`
 
-            // Now we need the environment(s) available to our organization
-            const findEnvironmentStream = await environmentClient.findByOrganization({ organization: organizationId })
-            findEnvironmentStream.on('data', async ({ environment }) => {
-              console.log('ENVIRONMENT', environment)
+        content.appendChild(errorDiv)
+      }
+    }
 
-              // Now we'll select our first environment and list currently open tasks
-              const { id: environmentId } = environment
+    const findEnvironment = ({ organization: organizationId }) => {
+      return new Promise (async resolve => {
+        const environmentStream = await environmentClient.findByOrganization({ organization: organizationId })
 
-              const taskListStream = await taskClient.list({ environment: environmentId })
-
-              taskListStream.on('data', ({ task }) => {
-                console.log('TASK', task)
-              })
-            })
-          })
-
-          findOrgsAvailableToUserStream.on('error', error => {
-            // TODO: Handle find organizations error
-          })
-
-          findOrgsAvailableToUserStream.on('end', () => {
-            console.log('ORGANIZATION STREAM ENDED')
-          })
-
-        } else {
-          console.log('AUTHENTICATION ERROR - DID YOU INPUT YOUR CREDENTIALS?')
-        }
+        environmentStream.on('data', ({ environment }) => resolve(environment))
       })
-    })
+    }
+
+    const findOpenTasks = async ({ environment: environmentId }) => {
+      return new Promise (async resolve => {
+        const taskStream = await taskClient.list({ environment: environmentId })
+  
+        const tasks = []
+
+        // We add all the currently available tasks to an array and resolve our promise with it. It is also possible to continue listening to newly opened tasks and add them as they're opened.
+        taskStream.on('data', ({ task }) => {
+          if (task) tasks.push(task)
+          else resolve(tasks)
+        })
+      })
+    }
+
+    const constructOrgDiv = ({ content }, { organization }) => {
+      const orgDiv = document.createElement('div')
+      orgDiv.style.outline = "solid"
+      orgDiv.style.padding = "10px"
+      orgDiv.style.margin = "10px"
+
+      orgDiv.addEventListener('click', async () => {
+        console.log('ORGANIZATION SELECTED', organization.id)
+        // The first thing we do on organization select is issue a token specific to the organization
+        await userClient.issueToken({ organization: organization.id })
+
+        // Then we need to retrieve the environment id for the selected organization. Currently organization<->environment is a 1 to 1 relationship, but that may not always be the case.
+        const environment = await findEnvironment({ organization: organization.id })
+        const { id: environmentId } = environment
+        console.log('FOUND ENVIRONMENT', environment)
+
+        console.log('FINDING ENVIRONMENT TASKS')
+        // Now we're retrieving the tasks for our environment. 
+        const tasks = await findOpenTasks({ environment: environmentId })
+        console.log('TASKS', tasks)
+
+        _.map(task => {
+          const taskDiv = document.createElement('div')
+          taskDiv.innerText = `${task.shortName} - ${task.id} : ${task.status}`
+          content.appendChild(taskDiv)
+        })(tasks)
+      })
+
+      const orgName = document.createElement('h3')
+      orgName.innerText = organization.name
+
+      orgDiv.appendChild(orgName)
+
+      const orgId = document.createElement('p')
+      orgId.innerText = organization.id
+
+      orgDiv.appendChild(orgId)
+
+      return orgDiv
+    }
   </script>
 </head>
 
 <body>
-  Hello from Complyify
+  <div>
+    <h2>Hello from Complyify</h2>
+    <p>Welcome to a simple example of how to use the Complyify SDK. Open your browser's developer console to see more.</p>
+  </div>  
+  <div>
+    <input id="username">
+    <input type="password" id="password">
+    <button id="login-btn" onclick="authenticate({ 
+        username: document.getElementById('username').value, 
+        password: document.getElementById('password').value 
+      })">Login</button>
+  </div>
+
+  <div id="content">
+
+  </div>
 </body>
 
 </html>
