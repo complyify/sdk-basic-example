@@ -103,6 +103,13 @@
         _.map(task => {
           const taskDiv = document.createElement('div')
           taskDiv.innerText = `${task.shortName} - ${task.id} : ${task.status}`
+
+          taskDiv.addEventListener('click', async () => {
+            const taskStream = await taskClient.find({ task: task.id })
+
+            taskStream.on('data', detail => console.log('TASK DETAIL', detail))
+          })
+
           content.appendChild(taskDiv)
         })(tasks)
       })
